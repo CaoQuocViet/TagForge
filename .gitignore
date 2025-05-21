@@ -172,3 +172,12 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+
+
+# Bỏ qua thư mục và file liên quan đến download và tài liệu Canva
+download/
+Canva docx/
+2download.rar
+download.rar
+sample/
