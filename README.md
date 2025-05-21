@@ -24,18 +24,48 @@ Tự động tạo file `metadata.csv` từ một thư mục chứa nhiều icon
 
 ---
 
-## 📥 Đầu vào
+## 🗂️ Cấu trúc thư mục đầu vào
 
-- Thư mục chứa nhiều ảnh `.png`, mỗi ảnh là một icon theo chủ đề.
-- Tên file có định dạng: `001-name.png`, `002-anothername.png`, v.v.
+- **Thư mục gốc** được truyền vào (ví dụ: `E:\WORK\canva\sample\unziped_all`) chứa **nhiều thư mục chủ đề** (ví dụ: `110790-speeches`, `110791-sweet-home`, ...).
+- Mỗi thư mục chủ đề lại chứa nhiều thư mục con như `png/`, `svg/`, `eps/`, `license/`...
+
+👉 **Chỉ làm việc với ảnh trong thư mục con `png/`**.
+
+### Ví dụ cấu trúc:
+
+E:\WORK\canva\sample\unziped_all
+│
+├── 110790-speeches
+│ ├── png
+│ │ ├── 001-mic.png
+│ │ ├── 002-speech-bubble.png
+│ ├── svg
+│ ├── eps
+│ └── ...
+├── 110791-sweet-home
+│ └── png
+│ ├── 001-house.png
+│ ├── 002-door.png
 
 ---
 
 ## 📤 Đầu ra
 
-Một file `metadata.csv` chứa thông tin metadata cho từng ảnh PNG.
+- Thư mục output sẽ nằm tại: `E:\WORK\canva\output\`
+- Với mỗi thư mục chủ đề đầu vào, tạo một thư mục tương ứng bên trong output.
+- Trong mỗi thư mục output:
+  - **Giữ nguyên thư mục `png/` và `svg/` từ input (nếu cần copy lại)**
+  - Tạo file `metadata.csv` chứa mô tả cho toàn bộ ảnh trong `png/`.
 
-### Các cột cần có:
+### Ví dụ:
+
+E:\WORK\canva\output
+├── 110790-speeches
+│ ├── png
+│ ├── svg
+│ └── metadata.csv
+
+### Các cột cần có của file csv:
 
 | Cột        | Ý nghĩa |
 |------------|--------|
@@ -47,12 +77,29 @@ Một file `metadata.csv` chứa thông tin metadata cho từng ảnh PNG.
 
 ---
 
+## ⚙️ Công nghệ sử dụng
+
+- **Mô hình AI chính**: CLIP Interrogator (sử dụng BLIP + CLIP)
+- **Ngôn ngữ**: Python >= 3.8
+- **Thư viện chính**:
+  - `clip-interrogator`
+  - `Pillow`
+  - `pandas`
+- **Chạy cục bộ** (offline), tận dụng GPU nếu có.
+
+---
+
 ## 🧠 Quy trình xử lý
 
-1. Đọc từng ảnh `.png` trong thư mục.
-2. Sinh mô tả (`description`) cho ảnh bằng AI.
-3. Từ mô tả, sinh danh sách **25 từ khóa** (keywords).
-4. Tạo dòng metadata tương ứng trong CSV.
+1. **Duyệt đệ quy** tất cả thư mục con trong thư mục gốc.
+2. Với mỗi thư mục có `png/`:
+   - Đọc toàn bộ file `.png`.
+   - Với mỗi ảnh:
+     - Sinh mô tả chi tiết bằng AI (`description`).
+     - Từ mô tả → sinh 25 tag liên quan (`keywords`).
+     - Lấy tên file, **chuyển đuôi thành `.svg`** → `filename`
+     - Tên rút gọn không số thứ tự → `title`
+3. Ghi ra file `metadata.csv` với cấu trúc chuẩn.
 
 ---
 
