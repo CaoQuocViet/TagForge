@@ -58,33 +58,54 @@ def process_zip_file(zip_path, output_dir):
     """
     zip_name = zip_path.stem
     extract_dir = output_dir / zip_name
+    temp_dir = output_dir / f"_temp_{zip_name}"
     
     print(f"\nĐang xử lý: {zip_path.name}")
     
-    # Tạo thư mục cho file zip này
-    if extract_dir.exists():
-        shutil.rmtree(extract_dir)
-    extract_dir.mkdir()
+    # Xóa thư mục tạm nếu tồn tại từ lần chạy trước bị lỗi
+    if temp_dir.exists():
+        shutil.rmtree(temp_dir)
     
-    # Giải nén file zip
+    # Tạo thư mục tạm để giải nén
+    temp_dir.mkdir()
+    
     try:
+        # Giải nén vào thư mục tạm
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            # Hiển thị danh sách các file sẽ được giải nén
             file_list = zip_ref.namelist()
             print(f"Số lượng file/thư mục trong {zip_path.name}: {len(file_list)}")
+            zip_ref.extractall(temp_dir)
+        
+        # Kiểm tra xem có thư mục trùng tên không
+        temp_contents = list(temp_dir.iterdir())
+        if len(temp_contents) == 1 and temp_contents[0].is_dir() and temp_contents[0].name == zip_name:
+            # Nếu có thư mục trùng tên, di chuyển nội dung của nó lên một cấp
+            duplicate_dir = temp_contents[0]
             
-            # Giải nén toàn bộ
-            zip_ref.extractall(extract_dir)
+            # Xóa thư mục đích nếu tồn tại
+            if extract_dir.exists():
+                shutil.rmtree(extract_dir)
             
-            print(f"Đã giải nén thành công {zip_path.name} vào {extract_dir}")
+            # Đổi tên trực tiếp từ thư mục con lên thư mục cha
+            duplicate_dir.rename(extract_dir)
+            temp_dir.rmdir()  # Xóa thư mục tạm rỗng
+        else:
+            # Nếu không có thư mục trùng tên, di chuyển toàn bộ nội dung
+            if extract_dir.exists():
+                shutil.rmtree(extract_dir)
+            temp_dir.rename(extract_dir)
+        
+        # Đếm số lượng file và thư mục
+        total_files = sum(1 for _ in extract_dir.rglob('*') if _.is_file())
+        total_dirs = sum(1 for _ in extract_dir.rglob('*') if _.is_dir())
+        print(f"Đã giải nén thành công vào {extract_dir}")
+        print(f"Tổng số: {total_files} file, {total_dirs} thư mục")
+        
     except Exception as e:
         print(f"Lỗi khi giải nén {zip_path.name}: {e}")
-        return
-
-    # Đếm số lượng file và thư mục đã giải nén
-    total_files = sum(1 for _ in extract_dir.rglob('*') if _.is_file())
-    total_dirs = sum(1 for _ in extract_dir.rglob('*') if _.is_dir())
-    print(f"Tổng số: {total_files} file, {total_dirs} thư mục")
+        # Dọn dẹp trong trường hợp lỗi
+        if temp_dir.exists():
+            shutil.rmtree(temp_dir)
 
 
 def main():
