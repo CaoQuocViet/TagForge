@@ -6,7 +6,9 @@ import logging
 import string
 from keybert import KeyBERT
 from sklearn.feature_extraction.text import CountVectorizer
-from .utils import get_cache_path, save_to_cache, load_from_cache, setup_cache_dir
+
+# Sửa import từ tương đối sang tuyệt đối
+from models.utils import get_cache_path, save_to_cache, load_from_cache, setup_cache_dir
 
 logger = logging.getLogger("tag_generator")
 

@@ -4,9 +4,11 @@
 import os
 import logging
 from pathlib import Path
-from ..models.clip_model import ClipInterrogatorModel
-from ..models.tag_generator import TagGenerator
-from ..models.utils import clean_filename, extract_title
+
+# Sửa import từ tương đối sang tuyệt đối
+from models.clip_model import ClipInterrogatorModel
+from models.tag_generator import TagGenerator
+from models.utils import clean_filename, extract_title
 
 logger = logging.getLogger("processor")
 

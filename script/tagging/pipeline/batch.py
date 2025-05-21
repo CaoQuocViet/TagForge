@@ -8,8 +8,10 @@ import multiprocessing
 from pathlib import Path
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from .processor import ImageProcessor
-from ..models.utils import find_png_dirs
+
+# Sửa import từ tương đối sang tuyệt đối
+from pipeline.processor import ImageProcessor
+from models.utils import find_png_dirs
 
 logger = logging.getLogger("batch")
 

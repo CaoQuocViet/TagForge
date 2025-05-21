@@ -6,7 +6,7 @@ import torch
 from PIL import Image
 import logging
 from clip_interrogator import Config, Interrogator
-from .utils import get_cache_path, save_to_cache, load_from_cache, setup_cache_dir
+from models.utils import get_cache_path, save_to_cache, load_from_cache, setup_cache_dir
 
 logger = logging.getLogger("clip_model")
 

@@ -8,13 +8,17 @@ import logging
 import argparse
 from pathlib import Path
 
+# Thêm đường dẫn gốc của dự án vào sys.path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, current_dir)
+
 # Thiết lập logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler("tagging.log")
+        logging.FileHandler("tagging.log", encoding='utf-8')
     ]
 )
 logger = logging.getLogger("main")
@@ -26,56 +30,56 @@ from config import PathConfig, ModelConfig, ExecutionConfig
 
 def parse_args():
     """Parse command line arguments"""
-    parser = argparse.ArgumentParser(description="Tự động sinh metadata cho icon PNG")
+    parser = argparse.ArgumentParser(description="Icon PNG Metadata Generator")
     
     parser.add_argument(
         "input_dir", 
         type=str, 
         nargs='?',  # Làm tham số tùy chọn 
         default=PathConfig.DEFAULT_INPUT_DIR,
-        help=f"Thư mục gốc chứa các thư mục icon (mặc định: {PathConfig.DEFAULT_INPUT_DIR})"
+        help=f"Input directory containing icon folders (default: {PathConfig.DEFAULT_INPUT_DIR})"
     )
     
     parser.add_argument(
         "--output_dir", 
         type=str,
         default=PathConfig.DEFAULT_OUTPUT_DIR,
-        help=f"Thư mục đầu ra (mặc định: {PathConfig.DEFAULT_OUTPUT_DIR})"
+        help=f"Output directory (default: {PathConfig.DEFAULT_OUTPUT_DIR})"
     )
     
     parser.add_argument(
         "--batch_size", 
         type=int,
         default=ExecutionConfig.BATCH_SIZE,
-        help=f"Số ảnh xử lý mỗi lần (mặc định: {ExecutionConfig.BATCH_SIZE})"
+        help=f"Number of images to process in each batch (default: {ExecutionConfig.BATCH_SIZE})"
     )
     
     parser.add_argument(
         "--gpu", 
         type=bool,
         default=ExecutionConfig.USE_GPU,
-        help=f"Sử dụng GPU nếu có (mặc định: {ExecutionConfig.USE_GPU})"
+        help=f"Use GPU if available (default: {ExecutionConfig.USE_GPU})"
     )
     
     parser.add_argument(
         "--workers", 
         type=int,
         default=ExecutionConfig.NUM_WORKERS,
-        help="Số luồng xử lý song song (mặc định: tự phát hiện)"
+        help="Number of parallel workers (default: auto-detect)"
     )
     
     parser.add_argument(
         "--cache_dir", 
         type=str,
         default=PathConfig.DEFAULT_CACHE_DIR,
-        help=f"Thư mục lưu cache (mặc định: {PathConfig.DEFAULT_CACHE_DIR})"
+        help=f"Cache directory (default: {PathConfig.DEFAULT_CACHE_DIR})"
     )
     
     parser.add_argument(
         "--num_tags", 
         type=int,
         default=ModelConfig.NUM_TAGS,
-        help=f"Số lượng tags cần sinh (mặc định: {ModelConfig.NUM_TAGS})"
+        help=f"Number of tags to generate (default: {ModelConfig.NUM_TAGS})"
     )
     
     return parser.parse_args()
@@ -86,17 +90,17 @@ def main():
     args = parse_args()
     
     # Hiển thị thông tin cấu hình
-    logger.info("=== CLIP Interrogator - Sinh Metadata Icon ===")
-    logger.info(f"Thư mục đầu vào: {args.input_dir}")
-    logger.info(f"Thư mục đầu ra: {args.output_dir}")
-    logger.info(f"Sử dụng GPU: {args.gpu}")
+    logger.info("=== CLIP Interrogator - Icon Metadata Generator ===")
+    logger.info(f"Input directory: {args.input_dir}")
+    logger.info(f"Output directory: {args.output_dir}")
+    logger.info(f"Use GPU: {args.gpu}")
     logger.info(f"Batch size: {args.batch_size}")
     logger.info(f"Cache: {args.cache_dir}")
-    logger.info(f"Số lượng tags: {args.num_tags}")
+    logger.info(f"Number of tags: {args.num_tags}")
     
     # Kiểm tra thư mục đầu vào
     if not os.path.isdir(args.input_dir):
-        logger.error(f"Thư mục đầu vào không tồn tại: {args.input_dir}")
+        logger.error(f"Input directory does not exist: {args.input_dir}")
         return 1
     
     # Bắt đầu xử lý
@@ -112,18 +116,18 @@ def main():
         )
         
         # Xử lý hàng loạt
-        logger.info("Bắt đầu xử lý batch...")
+        logger.info("Starting batch processing...")
         batch_results = batch_processor.process_batch(args.input_dir)
         
         if not batch_results:
-            logger.error("Không có kết quả nào được sinh ra!")
+            logger.error("No results were generated!")
             return 1
         
         # Khởi tạo exporter
         exporter = MetadataExporter(output_base_dir=args.output_dir)
         
         # Xuất kết quả
-        logger.info("Bắt đầu xuất kết quả...")
+        logger.info("Starting export process...")
         success_count = exporter.export_batch_results(batch_results, args.input_dir)
         
         # Tính thời gian
@@ -131,13 +135,13 @@ def main():
         hours, remainder = divmod(elapsed_time, 3600)
         minutes, seconds = divmod(remainder, 60)
         
-        logger.info(f"Hoàn thành! Đã xử lý {success_count} thư mục")
-        logger.info(f"Tổng thời gian: {int(hours)}h {int(minutes)}m {int(seconds)}s")
+        logger.info(f"Completed! Processed {success_count} directories")
+        logger.info(f"Total time: {int(hours)}h {int(minutes)}m {int(seconds)}s")
         
         return 0
         
     except Exception as e:
-        logger.error(f"Lỗi không xử lý được: {e}", exc_info=True)
+        logger.error(f"Unhandled error: {e}", exc_info=True)
         return 1
 
 if __name__ == "__main__":
