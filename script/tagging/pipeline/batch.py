@@ -9,55 +9,55 @@ from pathlib import Path
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-# Sửa import từ tương đối sang tuyệt đối
+# Changed from relative to absolute import
 from pipeline.processor import ImageProcessor
 from models.utils import find_png_dirs
 
 logger = logging.getLogger("batch")
 
 class BatchProcessor:
-    """Xử lý hàng loạt nhiều thư mục PNG"""
+    """Process batches of PNG directories"""
     
     def __init__(self, use_gpu=True, batch_size=32, workers=None, cache_dir="data/cache"):
         self.use_gpu = use_gpu
         self.batch_size = batch_size
         self.cache_dir = cache_dir
         
-        # Số worker mặc định là số CPU logic trừ 1 (giữ 1 core cho hệ thống)
-        # GPU chỉ dùng 1 worker vì không thể song song hóa xử lý GPU
+        # Default number of workers is logical CPU count minus 1 (keep 1 core for system)
+        # GPU uses only 1 worker since it can't parallelize GPU processing
         if workers is None:
             self.workers = 1 if use_gpu else max(1, multiprocessing.cpu_count() - 1)
         else:
             self.workers = max(1, int(workers))
         
-        logger.info(f"Khởi tạo BatchProcessor: use_gpu={use_gpu}, batch_size={batch_size}, workers={self.workers}")
+        logger.info(f"Initialized BatchProcessor: use_gpu={use_gpu}, batch_size={batch_size}, workers={self.workers}")
     
     def process_directory(self, png_dir):
         """
-        Xử lý toàn bộ ảnh PNG trong một thư mục
+        Process all PNG images in a directory
         
         Args:
-            png_dir: Đường dẫn đến thư mục chứa file PNG
+            png_dir: Path to directory containing PNG files
             
         Returns:
-            List các metadata đã xử lý
+            List of processed metadata
         """
-        # Tìm tất cả file PNG trong thư mục
+        # Find all PNG files in the directory
         png_files = sorted([f for f in Path(png_dir).glob("*.png")])
         
         if not png_files:
-            logger.warning(f"Không tìm thấy file PNG nào trong {png_dir}")
+            logger.warning(f"No PNG files found in {png_dir}")
             return []
         
-        logger.info(f"Tìm thấy {len(png_files)} file PNG trong {png_dir}")
+        logger.info(f"Found {len(png_files)} PNG files in {png_dir}")
         
-        # Khởi tạo processor
+        # Initialize processor
         processor = ImageProcessor(use_gpu=self.use_gpu, cache_dir=self.cache_dir)
         
         results = []
         
-        # Xử lý từng ảnh
-        for png_file in tqdm(png_files, desc=f"Xử lý {os.path.basename(png_dir)}"):
+        # Process each image
+        for png_file in tqdm(png_files, desc=f"Processing {os.path.basename(png_dir)}"):
             metadata = processor.process_image(str(png_file), use_cache=True)
             if metadata:
                 results.append(metadata)
@@ -66,61 +66,61 @@ class BatchProcessor:
     
     def process_batch(self, input_dir):
         """
-        Xử lý hàng loạt nhiều thư mục PNG
+        Process multiple PNG directories in batch
         
         Args:
-            input_dir: Thư mục gốc chứa các thư mục con có PNG
+            input_dir: Root directory containing subdirectories with PNGs
             
         Returns:
-            Dict với key là thư mục mục tiêu, value là list metadata
+            Dict with target directory as key and metadata list as value
         """
-        # Tìm tất cả thư mục PNG
+        # Find all PNG directories
         png_dirs = find_png_dirs(input_dir)
         
         if not png_dirs:
-            logger.error(f"Không tìm thấy thư mục PNG nào trong {input_dir}")
+            logger.error(f"No PNG directories found in {input_dir}")
             return {}
         
-        logger.info(f"Tìm thấy {len(png_dirs)} thư mục PNG để xử lý")
+        logger.info(f"Found {len(png_dirs)} PNG directories to process")
         
-        # Lưu kết quả
+        # Store results
         results = {}
         
-        # Nếu chỉ xử lý trên 1 worker (GPU/CPU đơn luồng)
+        # If processing with only 1 worker (GPU/single-threaded CPU)
         if self.workers == 1:
             for png_dir in png_dirs:
-                # Xử lý directory này
+                # Process this directory
                 target_dir = self._get_target_directory(png_dir)
-                logger.info(f"Đang xử lý thư mục: {target_dir}")
+                logger.info(f"Processing directory: {target_dir}")
                 
-                # Xử lý và lưu kết quả
+                # Process and save results
                 metadata_list = self.process_directory(png_dir)
                 results[target_dir] = metadata_list
         else:
-            # Xử lý song song trên nhiều CPU
+            # Parallel processing on multiple CPUs
             with ProcessPoolExecutor(max_workers=self.workers) as executor:
-                # Tạo ánh xạ từ future -> dir để theo dõi
+                # Create mapping from future -> dir to track
                 future_to_dir = {
                     executor.submit(self.process_directory, png_dir): self._get_target_directory(png_dir)
                     for png_dir in png_dirs
                 }
                 
-                # Theo dõi tiến trình
-                for future in tqdm(as_completed(future_to_dir), total=len(png_dirs), desc="Xử lý các thư mục"):
+                # Track progress
+                for future in tqdm(as_completed(future_to_dir), total=len(png_dirs), desc="Processing directories"):
                     target_dir = future_to_dir[future]
                     try:
                         metadata_list = future.result()
                         results[target_dir] = metadata_list
                     except Exception as e:
-                        logger.error(f"Xử lý thư mục {target_dir} gặp lỗi: {e}")
+                        logger.error(f"Error processing directory {target_dir}: {e}")
         
         return results
     
     def _get_target_directory(self, png_dir):
         """
-        Lấy tên thư mục đích từ đường dẫn PNG
-        Ví dụ: input/110790-speeches/png -> 110790-speeches
+        Get target directory name from PNG path
+        Example: input/110790-speeches/png -> 110790-speeches
         """
-        # Lấy thư mục cha của thư mục PNG
+        # Get parent directory of PNG directory
         parent_dir = Path(png_dir).parent
         return os.path.basename(parent_dir) 

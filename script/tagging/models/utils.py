@@ -9,7 +9,7 @@ from pathlib import Path
 from PIL import Image
 import logging
 
-# Thiết lập logging
+# Setup logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -21,27 +21,27 @@ logging.basicConfig(
 logger = logging.getLogger("tag_utils")
 
 def setup_cache_dir(cache_dir="data/cache"):
-    """Tạo thư mục cache nếu chưa tồn tại"""
+    """Create cache directory if it doesn't exist"""
     os.makedirs(cache_dir, exist_ok=True)
     return cache_dir
 
 def get_cache_path(image_path, prefix="desc_", cache_dir="data/cache"):
-    """Tạo đường dẫn file cache dựa trên hash của đường dẫn ảnh"""
+    """Create cache file path based on image path hash"""
     image_hash = hashlib.md5(str(image_path).encode()).hexdigest()
     return os.path.join(cache_dir, f"{prefix}{image_hash}.json")
 
 def save_to_cache(data, cache_path):
-    """Lưu dữ liệu vào file cache"""
+    """Save data to cache file"""
     try:
         with open(cache_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
         return True
     except Exception as e:
-        logger.error(f"Lỗi khi lưu cache: {e}")
+        logger.error(f"Error saving to cache: {e}")
         return False
 
 def load_from_cache(cache_path):
-    """Đọc dữ liệu từ file cache"""
+    """Read data from cache file"""
     if not os.path.exists(cache_path):
         return None
     
@@ -49,39 +49,39 @@ def load_from_cache(cache_path):
         with open(cache_path, 'r', encoding='utf-8') as f:
             return json.load(f)
     except Exception as e:
-        logger.error(f"Lỗi khi đọc cache: {e}")
+        logger.error(f"Error reading from cache: {e}")
         return None
 
 def clean_filename(filename):
-    """Tạo tên file svg từ tên file png"""
+    """Create svg filename from png filename"""
     return os.path.splitext(filename)[0] + ".svg"
 
 def extract_title(filename):
-    """Tạo title từ filename, loại bỏ số thứ tự đầu và phần mở rộng"""
-    # Loại bỏ phần mở rộng file
+    """Create title from filename, removing leading index number and extension"""
+    # Remove file extension
     name = os.path.splitext(filename)[0]
     
-    # Loại bỏ số thứ tự đầu file (nếu có)
-    # Pattern tìm dạng: 001-, 01-, 1-, etc.
+    # Remove leading index number (if any)
+    # Pattern matches: 001-, 01-, 1-, etc.
     clean_name = re.sub(r'^\d+[-_]\s*', '', name)
     
-    # Chuyển các dấu gạch ngang thành khoảng trắng và chuẩn hóa
+    # Convert hyphens to spaces and normalize
     clean_name = clean_name.replace('-', ' ').replace('_', ' ')
     clean_name = ' '.join(clean_name.split())
     
     return clean_name
 
 def load_image(image_path):
-    """Đọc file ảnh từ đường dẫn"""
+    """Read image file from path"""
     try:
         img = Image.open(image_path).convert('RGB')
         return img
     except Exception as e:
-        logger.error(f"Lỗi khi đọc ảnh {image_path}: {e}")
+        logger.error(f"Error reading image {image_path}: {e}")
         return None
 
 def find_png_dirs(root_dir):
-    """Tìm tất cả thư mục png trong cấu trúc thư mục"""
+    """Find all png directories in the directory structure"""
     png_dirs = []
     
     for dirpath, dirnames, filenames in os.walk(root_dir):

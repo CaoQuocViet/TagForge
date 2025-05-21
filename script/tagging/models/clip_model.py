@@ -11,62 +11,62 @@ from models.utils import get_cache_path, save_to_cache, load_from_cache, setup_c
 logger = logging.getLogger("clip_model")
 
 class ClipInterrogatorModel:
-    """Wrapper cho CLIP Interrogator để sinh mô tả từ ảnh"""
+    """Wrapper for CLIP Interrogator to generate descriptions from images"""
     
     def __init__(self, clip_model_name="ViT-L/14", device=None, cache_dir="data/cache"):
         self.cache_dir = setup_cache_dir(cache_dir)
         
-        # Xác định device (CPU/GPU)
+        # Determine device (CPU/GPU)
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-        logger.info(f"Sử dụng device: {self.device}")
+        logger.info(f"Using device: {self.device}")
         
-        # Khởi tạo CLIP Interrogator
+        # Initialize CLIP Interrogator
         try:
             config = Config(clip_model_name=clip_model_name)
             config.device = self.device
             
-            # Nếu chạy trên GPU thì không cần offload (đủ VRAM)
+            # If running on GPU, no need to offload (sufficient VRAM)
             if self.device == "cuda":
                 config.blip_offload = False
-                logger.info("Sử dụng GPU đầy đủ (không offload)")
+                logger.info("Using full GPU (no offload)")
             
             self.ci = Interrogator(config)
-            logger.info(f"Đã khởi tạo CLIP Interrogator với model {clip_model_name}")
+            logger.info(f"CLIP Interrogator initialized with model {clip_model_name}")
         except Exception as e:
-            logger.error(f"Lỗi khi khởi tạo CLIP Interrogator: {e}")
+            logger.error(f"Error initializing CLIP Interrogator: {e}")
             raise
     
     def generate_description(self, image_path, use_cache=True):
-        """Sinh mô tả từ ảnh với cache"""
-        # Tạo đường dẫn file cache
+        """Generate description from image with caching"""
+        # Create cache file path
         cache_path = get_cache_path(image_path, prefix="desc_", cache_dir=self.cache_dir)
         
-        # Kiểm tra cache nếu được yêu cầu
+        # Check cache if requested
         if use_cache:
             cached_data = load_from_cache(cache_path)
             if cached_data:
-                logger.info(f"Sử dụng description từ cache cho {os.path.basename(image_path)}")
+                logger.info(f"Using cached description for {os.path.basename(image_path)}")
                 return cached_data["description"]
         
-        # Nếu không có cache hoặc không dùng cache, sinh mô tả mới
+        # If no cache or not using cache, generate new description
         try:
-            # Đọc ảnh
+            # Read image
             image = Image.open(image_path).convert('RGB')
             
-            # Sinh mô tả
-            logger.info(f"Đang sinh mô tả cho {os.path.basename(image_path)}")
+            # Generate description
+            logger.info(f"Generating description for {os.path.basename(image_path)}")
             description = self.ci.interrogate(image)
             
-            # Lưu cache
+            # Save to cache
             save_to_cache({"description": description}, cache_path)
             
             return description
         except Exception as e:
-            logger.error(f"Lỗi khi sinh mô tả cho {image_path}: {e}")
+            logger.error(f"Error generating description for {image_path}: {e}")
             return None
         
     def __del__(self):
-        """Giải phóng tài nguyên khi đối tượng bị hủy"""
+        """Free resources when object is destroyed"""
         if hasattr(self, 'ci'):
             del self.ci
         torch.cuda.empty_cache() 

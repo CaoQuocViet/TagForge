@@ -5,25 +5,25 @@ import sys
 import argparse
 from pathlib import Path
 
-# Import cấu hình
+# Import configuration
 try:
     from config import PathConfig, ExecutionConfig
     from unzip_files_all import unzip_all_files
     from unzip_files_svg_only import unzip_files
 except ImportError as e:
-    print(f"Lỗi: Không thể import module cần thiết: {e}")
+    print(f"Error: Cannot import required module: {e}")
     sys.exit(1)
 
 def parse_args():
     """Parse command line arguments"""
-    parser = argparse.ArgumentParser(description="Giải nén file ZIP với các tùy chọn")
+    parser = argparse.ArgumentParser(description="Extract ZIP files with options")
     
     parser.add_argument(
         "input_dir", 
         type=str, 
-        nargs='?',  # Làm tham số tùy chọn
+        nargs='?',  # Make parameter optional
         default=PathConfig.DEFAULT_INPUT_DIR,
-        help=f"Thư mục chứa file ZIP (mặc định: {PathConfig.DEFAULT_INPUT_DIR})"
+        help=f"Directory containing ZIP files (default: {PathConfig.DEFAULT_INPUT_DIR})"
     )
     
     parser.add_argument(
@@ -31,39 +31,39 @@ def parse_args():
         type=str,
         choices=["all", "svg_only"],
         default=ExecutionConfig.DEFAULT_MODE,
-        help=f"Chế độ giải nén: all=giữ nguyên cấu trúc, svg_only=chỉ giữ thư mục svg (mặc định: {ExecutionConfig.DEFAULT_MODE})"
+        help=f"Extraction mode: all=keep all structure, svg_only=keep only svg directory (default: {ExecutionConfig.DEFAULT_MODE})"
     )
     
     parser.add_argument(
         "--overwrite", 
         action="store_true",
         default=ExecutionConfig.OVERWRITE_EXISTING,
-        help="Ghi đè lên thư mục đã tồn tại"
+        help="Overwrite existing directories"
     )
     
     return parser.parse_args()
 
 def main():
-    """Entrypoint chính của ứng dụng"""
+    """Main entry point of the application"""
     # Parse arguments
     args = parse_args()
     
-    print("=== Giải Nén File ZIP ===")
-    print(f"Thư mục đầu vào: {args.input_dir}")
-    print(f"Chế độ giải nén: {args.mode}")
-    print(f"Ghi đè thư mục: {args.overwrite}")
+    print("=== ZIP File Extraction ===")
+    print(f"Input directory: {args.input_dir}")
+    print(f"Extraction mode: {args.mode}")
+    print(f"Overwrite directories: {args.overwrite}")
     
-    # Đặt biến môi trường tạm thời
-    # Lưu ý: điều này không thực sự thay đổi biến môi trường hệ thống
-    # nhưng tác động đến các lớp cấu hình của chúng ta
+    # Set temporary environment variable
+    # Note: this doesn't actually change the system environment variables
+    # but affects our configuration classes
     ExecutionConfig.OVERWRITE_EXISTING = args.overwrite
     
-    # Chạy chế độ giải nén tương ứng
+    # Run the corresponding extraction mode
     if args.mode == "all":
-        print("\n=== Chế độ ALL: Giữ nguyên cấu trúc ===")
+        print("\n=== ALL Mode: Keep entire structure ===")
         success = unzip_all_files(args.input_dir)
     else:  # svg_only
-        print("\n=== Chế độ SVG_ONLY: Chỉ giữ thư mục SVG ===")
+        print("\n=== SVG_ONLY Mode: Keep only SVG directory ===")
         success = unzip_files(args.input_dir)
     
     return 0 if success else 1
