@@ -7,8 +7,14 @@ import shutil
 import sys
 from pathlib import Path
 
+# Import cấu hình
+try:
+    from config import PathConfig, ExecutionConfig
+except ImportError:
+    print("Lỗi: Không thể import file cấu hình. Đảm bảo file config.py tồn tại.")
+    sys.exit(1)
 
-def unzip_files(input_dir):
+def unzip_files(input_dir=None):
     """
     Giải nén tất cả các file ZIP trong thư mục và chỉ giữ lại thư mục 'svg'.
     Tạo thư mục 'unziped_svg_only' để lưu trữ nội dung đã giải nén.
@@ -16,6 +22,10 @@ def unzip_files(input_dir):
     Tham số:
         input_dir (str): Đường dẫn đến thư mục chứa các file ZIP
     """
+    # Sử dụng đường dẫn mặc định nếu không được cung cấp
+    if input_dir is None:
+        input_dir = PathConfig.DEFAULT_INPUT_DIR
+    
     # Chuyển đổi sang đường dẫn tuyệt đối
     input_path = Path(input_dir).resolve()
     
@@ -25,7 +35,7 @@ def unzip_files(input_dir):
         return False
     
     # Tạo thư mục đầu ra
-    output_dir = input_path / "unziped_svg_only"
+    output_dir = Path(PathConfig.DEFAULT_SVG_OUTPUT_DIR) if input_dir == PathConfig.DEFAULT_INPUT_DIR else input_path / "unziped_svg_only"
     output_dir.mkdir(exist_ok=True)
     
     print(f"Thư mục đầu vào: {input_path}")
@@ -63,8 +73,12 @@ def process_zip_file(zip_path, output_dir):
     
     # Tạo thư mục cho file zip này
     if extract_dir.exists():
-        shutil.rmtree(extract_dir)
-    extract_dir.mkdir()
+        if ExecutionConfig.OVERWRITE_EXISTING:
+            shutil.rmtree(extract_dir)
+        else:
+            print(f"Thư mục {extract_dir} đã tồn tại và không được phép ghi đè")
+            return
+    extract_dir.mkdir(exist_ok=True)
     
     # Giải nén file zip
     try:
@@ -109,11 +123,11 @@ def process_zip_file(zip_path, output_dir):
 
 def main():
     """Hàm chính để xử lý tham số và chạy chương trình"""
-    if len(sys.argv) != 2:
-        print("Cách dùng: python unzip_files.py <đường_dẫn_thư_mục>")
-        return 1
+    if len(sys.argv) > 1:
+        input_dir = sys.argv[1]
+    else:
+        input_dir = None  # Sử dụng giá trị mặc định
     
-    input_dir = sys.argv[1]
     success = unzip_files(input_dir)
     
     return 0 if success else 1
