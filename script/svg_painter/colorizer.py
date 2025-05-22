@@ -2,6 +2,7 @@ import os
 import json
 import random
 import re
+import shutil
 from typing import List, Dict, Tuple
 from xml.etree import ElementTree as ET
 import colorsys
@@ -14,7 +15,7 @@ sys.path.insert(0, parent_dir)
 
 from script.svg_painter.config import (
     SVG_INPUT_DIR, SVG_OUTPUT_DIR, MERGED_COLORS_FILE,
-    BLACK_COLOR_VARIANTS, BLACK_RGB_THRESHOLD
+    BLACK_COLOR_VARIANTS, BLACK_RGB_THRESHOLD, DEFAULT_BLACK_ATTRIBUTES
 )
 
 def load_color_palettes() -> Dict:
@@ -24,6 +25,8 @@ def load_color_palettes() -> Dict:
 
 def hex_to_rgb(hex_color: str) -> Tuple[int, int, int]:
     """Convert hex color to RGB tuple"""
+    if not hex_color:
+        return (0, 0, 0)
     hex_color = hex_color.lstrip('#')
     if len(hex_color) == 3:
         hex_color = ''.join(c + c for c in hex_color)
@@ -35,6 +38,8 @@ def rgb_to_hex(rgb: Tuple[int, int, int]) -> str:
 
 def parse_rgb_string(rgb_str: str) -> Tuple[int, int, int]:
     """Parse RGB string to RGB tuple"""
+    if not rgb_str:
+        return (0, 0, 0)
     # Extract numbers from rgb(x,y,z) or rgba(x,y,z,a)
     numbers = re.findall(r'\d+', rgb_str)
     return tuple(int(n) for n in numbers[:3])
@@ -46,27 +51,42 @@ def is_black_or_near_black(color: str) -> bool:
     
     try:
         # Handle hex colors
-        if color.startswith('#'):
+        if color and color.startswith('#'):
             r, g, b = hex_to_rgb(color)
         # Handle rgb/rgba colors
-        elif color.startswith('rgb'):
+        elif color and color.startswith('rgb'):
             r, g, b = parse_rgb_string(color)
         else:
-            return False
+            # If no color specified and element is in DEFAULT_BLACK_ATTRIBUTES, consider it black
+            return True
         
         # Check if all RGB values are below threshold
         return all(c <= BLACK_RGB_THRESHOLD for c in (r, g, b))
     except:
-        return False
+        # If there's any error parsing the color, consider it as default black
+        return True
 
 def find_svg_files(root_dir: str) -> List[str]:
     """Recursively find all SVG files in directory"""
     svg_files = []
     for dirpath, _, filenames in os.walk(root_dir):
-        for filename in filenames:
-            if filename.lower().endswith('.svg'):
-                svg_files.append(os.path.join(dirpath, filename))
+        if 'svg' in os.path.basename(dirpath).lower():
+            for filename in filenames:
+                if filename.lower().endswith('.svg'):
+                    svg_files.append(os.path.join(dirpath, filename))
     return svg_files
+
+def copy_non_svg_dirs(src_dir: str, dest_dir: str):
+    """Copy non-svg directories to output location"""
+    for item in os.listdir(src_dir):
+        src_path = os.path.join(src_dir, item)
+        dest_path = os.path.join(dest_dir, item)
+        
+        if os.path.isdir(src_path):
+            if 'svg' not in item.lower():
+                if os.path.exists(dest_path):
+                    shutil.rmtree(dest_path)
+                shutil.copytree(src_path, dest_path)
 
 def get_relative_output_path(input_path: str) -> str:
     """Get the relative output path maintaining directory structure"""
@@ -96,30 +116,50 @@ def process_svg_file(svg_path: str, color_palettes: Dict) -> None:
     def process_element(element):
         nonlocal color_index
         
+        # Check if element is a default black element
+        is_default_black = element.tag.split('}')[-1] in DEFAULT_BLACK_ATTRIBUTES
+        
         # List of attributes to check for colors
         color_attrs = ['fill', 'stroke']
+        has_color = False
         
+        # Check if element has any color attributes
         for attr in color_attrs:
             if attr in element.attrib:
+                has_color = True
                 color = element.attrib[attr]
-                if color and is_black_or_near_black(color):
+                if is_black_or_near_black(color):
                     # Replace black color with next color from palette
                     element.attrib[attr] = palette[color_index % len(palette)]
                     color_index += 1
         
+        # If element is a default black element and has no color attributes, add fill color
+        if is_default_black and not has_color:
+            element.attrib['fill'] = palette[color_index % len(palette)]
+            color_index += 1
+        
         # Process style attribute if present
         if 'style' in element.attrib:
             style = element.attrib['style']
+            style_has_color = False
+            
             for attr in color_attrs:
                 # Find color values in style attribute
                 pattern = f"{attr}:([^;]+)"
                 matches = re.finditer(pattern, style)
                 for match in matches:
+                    style_has_color = True
                     color = match.group(1)
                     if is_black_or_near_black(color):
                         new_color = palette[color_index % len(palette)]
                         style = style.replace(f"{attr}:{color}", f"{attr}:{new_color}")
                         color_index += 1
+            
+            # If no color in style and element is default black, add fill color
+            if is_default_black and not style_has_color and not has_color:
+                style += f";fill:{palette[color_index % len(palette)]}"
+                color_index += 1
+                
             element.attrib['style'] = style
         
         # Process child elements
@@ -141,6 +181,9 @@ def main():
     """Main function to process all SVG files"""
     # Load color palettes
     color_palettes = load_color_palettes()
+    
+    # Copy non-svg directories first
+    copy_non_svg_dirs(SVG_INPUT_DIR, SVG_OUTPUT_DIR)
     
     # Find all SVG files
     svg_files = find_svg_files(SVG_INPUT_DIR)

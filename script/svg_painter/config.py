@@ -1,4 +1,5 @@
 import os
+import shutil
 
 # Get the absolute path of the script
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -24,6 +25,9 @@ os.makedirs(SVG_OUTPUT_DIR, exist_ok=True)
 # Color detection settings
 BLACK_COLOR_VARIANTS = [
     '#000000', '#000', 'black', 'rgb(0,0,0)', 'rgb(0, 0, 0)',
-    '#010002', '#010101', '#020202'
+    '#010002', '#010101', '#020202', None, ''  # None and empty string for default black
 ]
 BLACK_RGB_THRESHOLD = 20  # Max RGB value to consider as "near black"
+
+# Default attributes that should be considered black if not specified
+DEFAULT_BLACK_ATTRIBUTES = ['path', 'circle', 'rect', 'polygon', 'ellipse']
