@@ -45,3 +45,8 @@ python script/unzip/main.py --mode svg_only
 python script/unzip/main.py "E:\WORK\canva\mysamples"
 
 .\venv\Scripts\Activate.ps1; 
+
+# Xử lý svg
+
+## Gộp các file json color
+python .\script\svg_painter\palettes\merge_color.py

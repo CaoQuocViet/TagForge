@@ -101,14 +101,15 @@ def process_zip_file(zip_path, output_dir):
             if extract_dir.exists():
                 shutil.rmtree(extract_dir)
             
-            # Rename directly from subdirectory to parent directory
-            duplicate_dir.rename(extract_dir)
+            # Use shutil.move instead of rename
+            shutil.move(str(duplicate_dir), str(extract_dir))
             temp_dir.rmdir()  # Remove empty temp directory
         else:
             # If no duplicate directory, move all contents
             if extract_dir.exists():
                 shutil.rmtree(extract_dir)
-            temp_dir.rename(extract_dir)
+            # Use shutil.move instead of rename
+            shutil.move(str(temp_dir), str(extract_dir))
         
         # Count files and directories
         total_files = sum(1 for _ in extract_dir.rglob('*') if _.is_file())
@@ -121,6 +122,12 @@ def process_zip_file(zip_path, output_dir):
         # Clean up in case of error
         if temp_dir.exists():
             shutil.rmtree(temp_dir)
+        if extract_dir.exists() and str(e).find("Access is denied") >= 0:
+            # If access denied, try to clean up the target directory
+            try:
+                shutil.rmtree(extract_dir)
+            except:
+                pass
 
 
 def main():

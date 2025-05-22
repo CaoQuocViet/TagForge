@@ -13,12 +13,16 @@ class PathConfig:
     DEFAULT_INPUT_DIR = os.environ.get('CANVA_ZIP_INPUT_DIR', str(PROJECT_ROOT / "sample"))
     
     # Output directory for SVG only
-    DEFAULT_SVG_OUTPUT_DIR = os.environ.get('CANVA_SVG_OUTPUT_DIR', 
-                                         lambda: os.path.join(str(PathConfig.DEFAULT_INPUT_DIR), "unziped_svg_only"))()
+    DEFAULT_SVG_OUTPUT_DIR = os.environ.get(
+        'CANVA_SVG_OUTPUT_DIR', 
+        os.path.join(os.environ.get('CANVA_ZIP_INPUT_DIR', str(PROJECT_ROOT / "sample")), "unziped_svg_only")
+    )
     
     # Output directory for ALL files
-    DEFAULT_ALL_OUTPUT_DIR = os.environ.get('CANVA_ALL_OUTPUT_DIR', 
-                                         lambda: os.path.join(str(PathConfig.DEFAULT_INPUT_DIR), "unziped_all"))()
+    DEFAULT_ALL_OUTPUT_DIR = os.environ.get(
+        'CANVA_ALL_OUTPUT_DIR', 
+        os.path.join(os.environ.get('CANVA_ZIP_INPUT_DIR', str(PROJECT_ROOT / "sample")), "unziped_all")
+    )
 
 # Execution configuration
 class ExecutionConfig:
