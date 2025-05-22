@@ -7,6 +7,7 @@ from typing import List, Dict, Tuple
 from xml.etree import ElementTree as ET
 import colorsys
 import sys
+from collections import deque
 
 # Add the parent directory to Python path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -93,7 +94,35 @@ def get_relative_output_path(input_path: str) -> str:
     rel_path = os.path.relpath(input_path, SVG_INPUT_DIR)
     return os.path.join(SVG_OUTPUT_DIR, rel_path)
 
-def process_svg_file(svg_path: str, color_palettes: Dict) -> None:
+class ColorPaletteManager:
+    def __init__(self, color_palettes: Dict):
+        self.all_palettes = color_palettes
+        self.available_palette_ids = list(color_palettes.keys())
+        random.shuffle(self.available_palette_ids)  # Shuffle initially
+        self.current_index = 0
+    
+    def get_next_palette(self) -> Tuple[str, List[str]]:
+        """Get next unused palette and select 1-2 random colors from it"""
+        if self.current_index >= len(self.available_palette_ids):
+            random.shuffle(self.available_palette_ids)
+            self.current_index = 0
+        
+        palette_id = self.available_palette_ids[self.current_index]
+        self.current_index += 1
+        
+        # Get all colors from the palette
+        all_colors = self.all_palettes[palette_id]['colors'].copy()
+        
+        # Randomly decide to use 1 or 2 colors
+        num_colors = random.randint(1, 2)
+        
+        # Randomly select colors
+        random.shuffle(all_colors)
+        selected_colors = all_colors[:num_colors]
+        
+        return palette_id, selected_colors
+
+def process_svg_file(svg_path: str, palette_manager: ColorPaletteManager) -> None:
     """Process a single SVG file"""
     # Parse SVG file
     try:
@@ -103,9 +132,8 @@ def process_svg_file(svg_path: str, color_palettes: Dict) -> None:
         print(f"Error parsing SVG file: {svg_path}")
         return
 
-    # Choose a random color palette
-    palette_id = random.choice(list(color_palettes.keys()))
-    palette = color_palettes[palette_id]['colors']
+    # Get next unused palette with 1-2 colors
+    palette_id, palette = palette_manager.get_next_palette()
     color_index = 0
     
     # Register SVG namespace
@@ -129,14 +157,14 @@ def process_svg_file(svg_path: str, color_palettes: Dict) -> None:
                 has_color = True
                 color = element.attrib[attr]
                 if is_black_or_near_black(color):
-                    # Replace black color with next color from palette
+                    # Replace black color with next color from limited palette
                     element.attrib[attr] = palette[color_index % len(palette)]
-                    color_index += 1
+                    color_index = (color_index + 1) % len(palette)  # Cycle through available colors
         
         # If element is a default black element and has no color attributes, add fill color
         if is_default_black and not has_color:
             element.attrib['fill'] = palette[color_index % len(palette)]
-            color_index += 1
+            color_index = (color_index + 1) % len(palette)  # Cycle through available colors
         
         # Process style attribute if present
         if 'style' in element.attrib:
@@ -153,12 +181,12 @@ def process_svg_file(svg_path: str, color_palettes: Dict) -> None:
                     if is_black_or_near_black(color):
                         new_color = palette[color_index % len(palette)]
                         style = style.replace(f"{attr}:{color}", f"{attr}:{new_color}")
-                        color_index += 1
+                        color_index = (color_index + 1) % len(palette)  # Cycle through available colors
             
             # If no color in style and element is default black, add fill color
             if is_default_black and not style_has_color and not has_color:
                 style += f";fill:{palette[color_index % len(palette)]}"
-                color_index += 1
+                color_index = (color_index + 1) % len(palette)  # Cycle through available colors
                 
             element.attrib['style'] = style
         
@@ -175,12 +203,13 @@ def process_svg_file(svg_path: str, color_palettes: Dict) -> None:
     
     # Save the modified SVG
     tree.write(output_path, encoding='utf-8', xml_declaration=True)
-    print(f"Processed: {svg_path} -> {output_path}")
+    print(f"Processed: {svg_path} -> {output_path} (using palette {palette_id} with {len(palette)} colors)")
 
 def main():
     """Main function to process all SVG files"""
     # Load color palettes
     color_palettes = load_color_palettes()
+    palette_manager = ColorPaletteManager(color_palettes)
     
     # Copy non-svg directories first
     copy_non_svg_dirs(SVG_INPUT_DIR, SVG_OUTPUT_DIR)
@@ -192,7 +221,7 @@ def main():
     # Process each SVG file
     for svg_file in svg_files:
         try:
-            process_svg_file(svg_file, color_palettes)
+            process_svg_file(svg_file, palette_manager)
         except Exception as e:
             print(f"Error processing {svg_file}: {str(e)}")
 
