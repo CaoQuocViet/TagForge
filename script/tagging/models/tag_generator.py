@@ -55,8 +55,9 @@ class TagGenerator:
     
     def _load_stopwords(self):
         """Load list of common stopwords"""
-        # Common English stopwords
-        common_stopwords = set([
+        # Common English stopwords plus domain-specific terms
+        return [
+            # Basic English stopwords
             'a', 'an', 'the', 'and', 'or', 'but', 'if', 'because', 'as', 'what',
             'which', 'this', 'that', 'these', 'those', 'then', 'just', 'so', 'than', 'such',
             'when', 'where', 'how', 'why', 'while', 'with', 'without', 'of', 'at', 'by',
@@ -64,14 +65,38 @@ class TagGenerator:
             'further', 'then', 'once', 'here', 'there', 'all', 'any', 'both', 'each',
             'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only',
             'own', 'same', 'so', 'than', 'too', 'very', 'can', 'will', 'should', 'now',
-            'showing', 'shown', 'shows', 'image', 'graphic', 'illustration', 'icon', 'icons', 
-            'stylized', 'simple', 'vector', 'design', 'style', 'artwork'
-        ])
-        return common_stopwords
+            
+            # Domain-specific stopwords
+            'showing', 'shown', 'shows', 'image', 'graphic', 'illustration', 'icon', 'icons',
+            'stylized', 'simple', 'vector', 'design', 'style', 'artwork', 'background',
+            'close', 'up', 'black', 'white', 'dark', 'light', 'color', 'colored',
+            'resolution', 'pixel', 'pixels', 'px', 'full', 'frame', 'shot', 'view',
+            'seen', 'looking', 'appears', 'showing', 'featuring', 'depicts', 'depicting',
+            'contains', 'containing', 'consists', 'consisting', 'represents', 'representing',
+            'photo', 'photograph', 'picture', 'pic', 'img', 'jpeg', 'jpg', 'png', 'svg',
+            'file', 'files', 'format', 'formats', 'size', 'sizes', 'dimension', 'dimensions',
+            'overlay', 'overlays', 'overlay', 'overlaying', 'overlaid',
+            'isolated', 'against', 'background', 'bg', 'clipart', 'stock',
+            'single', 'multiple', 'various', 'different', 'several', 'many',
+            'set', 'collection', 'group', 'pack', 'bundle',
+            'new', 'old', 'modern', 'contemporary', 'traditional',
+            'high', 'low', 'quality', 'detailed', 'simple', 'complex',
+            'made', 'created', 'designed', 'drawn', 'illustrated',
+            'using', 'used', 'usage', 'utilize', 'utilized',
+            'like', 'similar', 'type', 'kind', 'sort',
+            'part', 'piece', 'element', 'component',
+            'version', 'variant', 'variation', 'alternative',
+            
+            # Numbers and measurements
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+            'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+            'x', 'px', 'pixel', 'pixels', 'resolution'
+        ]
     
     def _clean_tags(self, tags_list, min_length=2):
         """Clean the list of tags"""
         clean_tags = []
+        seen_words = set()  # Track unique words
         
         for tag, score in tags_list:
             # Skip if tag is None or empty
@@ -81,12 +106,19 @@ class TagGenerator:
             # Convert to string and clean
             tag = str(tag).strip().lower()
             
-            # Remove punctuation at start/end
-            tag = tag.strip(string.punctuation)
+            # Remove punctuation at start/end and within
+            tag = tag.translate(str.maketrans('', '', string.punctuation))
             
-            # Skip if too short or in stopwords
-            if len(tag) >= min_length and tag not in self.stopwords:
+            # Remove any non-ASCII characters
+            tag = ''.join(c for c in tag if ord(c) < 128)
+            
+            # Skip if too short, in stopwords, or already seen
+            if (len(tag) >= min_length and 
+                tag not in self.stopwords and 
+                tag not in seen_words and 
+                tag.isalpha()):
                 clean_tags.append((tag, score))
+                seen_words.add(tag)
         
         return clean_tags
     
@@ -96,6 +128,11 @@ class TagGenerator:
             logger.warning("Empty description provided")
             return []
             
+        # Clean description
+        description = ' '.join(word for word in description.split() 
+                             if word.isalpha() and len(word) > 1 
+                             and not any(char in word for char in '0123456789'))
+        
         # Create cache file path if image_path is provided
         cache_path = None
         if image_path and use_cache:
@@ -114,22 +151,40 @@ class TagGenerator:
             # Configure CountVectorizer for KeyBERT
             vectorizer = CountVectorizer(
                 ngram_range=(1, 2),              # Both single words and phrases
-                stop_words=self.stopwords,       # Remove stopwords
-                min_df=1,                        # Minimum frequency
-                lowercase=True                   # Convert to lowercase
+                stop_words=self.stopwords,       # Use our custom stopwords
+                min_df=0.0,                      # Allow terms that appear in any document
+                max_df=1.0,                      # Allow terms that appear in all documents
+                lowercase=True,                  # Convert to lowercase
+                max_features=None               # No limit on vocabulary size
             )
             
             # Extract keywords with diversity (MMR)
             try:
-                keywords = self.kw_model.extract_keywords(
+                # First pass: get single words with high diversity
+                keywords_single = self.kw_model.extract_keywords(
                     description,
-                    keyphrase_ngram_range=(1, 2),
+                    keyphrase_ngram_range=(1, 1),    # Single words only
                     stop_words=self.stopwords,
                     use_mmr=True,                    # Use MMR for diverse results
-                    diversity=diversity,             # Diversity level (0-1)
-                    top_n=40,                        # Get more for filtering
+                    diversity=0.7,                   # Moderate diversity for single words
+                    top_n=30,                        # Get more for filtering
                     vectorizer=vectorizer
                 )
+                
+                # Second pass: get phrases with lower diversity
+                keywords_phrases = self.kw_model.extract_keywords(
+                    description,
+                    keyphrase_ngram_range=(2, 2),    # Two-word phrases only
+                    stop_words=self.stopwords,
+                    use_mmr=True,                    # Use MMR for diverse results
+                    diversity=0.5,                   # Lower diversity for phrases
+                    top_n=10,                        # Fewer phrases
+                    vectorizer=vectorizer
+                )
+                
+                # Combine and clean
+                keywords = keywords_single + keywords_phrases
+                
             except Exception as kw_error:
                 logger.error(f"Error extracting keywords: {kw_error}")
                 return []
@@ -137,8 +192,25 @@ class TagGenerator:
             # Clean the tags list
             clean_keywords = self._clean_tags(keywords)
             
-            # Get top n tags
-            top_tags = [tag for tag, _ in clean_keywords[:num_tags]]
+            # Get top n tags, ensuring we have enough
+            top_tags = []
+            seen = set()
+            
+            # First add single-word tags
+            for tag, _ in clean_keywords:
+                if len(tag.split()) == 1 and tag not in seen:
+                    top_tags.append(tag)
+                    seen.add(tag)
+                if len(top_tags) >= num_tags * 0.7:  # 70% single words
+                    break
+            
+            # Then add phrases
+            for tag, _ in clean_keywords:
+                if len(tag.split()) > 1 and tag not in seen:
+                    top_tags.append(tag)
+                    seen.add(tag)
+                if len(top_tags) >= num_tags:
+                    break
             
             # Save to cache if image_path is provided
             if cache_path:
