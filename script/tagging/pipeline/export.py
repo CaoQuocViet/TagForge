@@ -51,8 +51,13 @@ class MetadataExporter:
             column_order = ["filename", "title", "keywords", "Artist", "description"]
             df = df[column_order]
             
-            # Write to CSV
-            df.to_csv(csv_path, index=False)
+            # Write to CSV with proper quoting
+            df.to_csv(csv_path, 
+                     index=False,
+                     encoding='utf-8',
+                     quoting=1,  # Quote all non-numeric fields
+                     quotechar='"',
+                     escapechar='\\')
             
             logger.info(f"Metadata exported successfully: {csv_path}")
             
