@@ -84,15 +84,31 @@ def copy_non_svg_dirs(src_dir: str, dest_dir: str):
         dest_path = os.path.join(dest_dir, item)
         
         if os.path.isdir(src_path):
+            # Skip if it's the output directory itself
+            if os.path.samefile(src_path, dest_dir):
+                continue
+                
             if 'svg' not in item.lower():
                 if os.path.exists(dest_path):
                     shutil.rmtree(dest_path)
                 shutil.copytree(src_path, dest_path)
+            else:
+                # For svg directories, we'll handle them separately
+                continue
 
 def get_relative_output_path(input_path: str) -> str:
     """Get the relative output path maintaining directory structure"""
+    # Get the path relative to the input directory
     rel_path = os.path.relpath(input_path, SVG_INPUT_DIR)
-    return os.path.join(SVG_OUTPUT_DIR, rel_path)
+    
+    # If the path contains 'svg' directory, process it
+    path_parts = rel_path.split(os.sep)
+    if 'svg' in path_parts:
+        # Keep the structure but output to SVG_OUTPUT_DIR
+        return os.path.join(SVG_OUTPUT_DIR, rel_path)
+    else:
+        # For non-svg files/directories, maintain original structure
+        return os.path.join(SVG_OUTPUT_DIR, rel_path)
 
 class ColorPaletteManager:
     def __init__(self, color_palettes: Dict):
