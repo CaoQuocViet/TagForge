@@ -50,3 +50,6 @@ python script/unzip/main.py "E:\WORK\canva\mysamples"
 
 ## Gộp các file json color
 python .\script\svg_painter\palettes\merge_color.py
+
+## Tô màu svg
+python script/svg_painter/colorizer.py
