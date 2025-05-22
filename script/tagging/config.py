@@ -27,10 +27,10 @@ class PathConfig:
 # AI model configuration
 class ModelConfig:
     # CLIP Interrogator model
-    CLIP_MODEL_NAME = os.environ.get('CANVA_CLIP_MODEL', "ViT-L/14")
+    CLIP_MODEL_NAME = os.environ.get('CANVA_CLIP_MODEL', "ViT-L-14/laion2b_s32b_b82k")
     
     # KeyBERT model
-    KEYBERT_MODEL_NAME = os.environ.get('CANVA_KEYBERT_MODEL', "all-MiniLM-L6-v2")
+    KEYBERT_MODEL_NAME = os.environ.get('CANVA_KEYBERT_MODEL', "distilbert-base-nli-mean-tokens")
     
     # Number of tags to generate
     NUM_TAGS = int(os.environ.get('CANVA_NUM_TAGS', "25"))

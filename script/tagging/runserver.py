@@ -6,6 +6,7 @@ import sys
 import time
 import logging
 import argparse
+import torch
 from pathlib import Path
 
 # Thêm đường dẫn gốc của dự án vào sys.path
@@ -22,6 +23,17 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger("main")
+
+# Kiểm tra GPU
+cuda_available = False
+try:
+    cuda_available = torch.cuda.is_available()
+    if cuda_available:
+        logger.info(f"CUDA available - GPU: {torch.cuda.get_device_name(0)}")
+    else:
+        logger.warning("CUDA not available - using CPU")
+except Exception as e:
+    logger.warning(f"Error checking CUDA: {e}")
 
 # Import các module
 from pipeline.batch import BatchProcessor
@@ -93,7 +105,7 @@ def main():
     logger.info("=== CLIP Interrogator - Icon Metadata Generator ===")
     logger.info(f"Input directory: {args.input_dir}")
     logger.info(f"Output directory: {args.output_dir}")
-    logger.info(f"Use GPU: {args.gpu}")
+    logger.info(f"Use GPU: {args.gpu and cuda_available}")
     logger.info(f"Batch size: {args.batch_size}")
     logger.info(f"Cache: {args.cache_dir}")
     logger.info(f"Number of tags: {args.num_tags}")
@@ -109,7 +121,7 @@ def main():
     try:
         # Khởi tạo batch processor
         batch_processor = BatchProcessor(
-            use_gpu=args.gpu,
+            use_gpu=args.gpu and cuda_available,
             batch_size=args.batch_size,
             workers=args.workers,
             cache_dir=args.cache_dir

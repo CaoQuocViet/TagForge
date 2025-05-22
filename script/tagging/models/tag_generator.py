@@ -6,6 +6,7 @@ import logging
 import string
 from keybert import KeyBERT
 from sklearn.feature_extraction.text import CountVectorizer
+from sentence_transformers import SentenceTransformer
 
 # Changed from relative to absolute import
 from models.utils import get_cache_path, save_to_cache, load_from_cache, setup_cache_dir
@@ -15,20 +16,42 @@ logger = logging.getLogger("tag_generator")
 class TagGenerator:
     """Generate tags from descriptions using KeyBERT"""
     
-    def __init__(self, model_name="all-MiniLM-L6-v2", device=None, cache_dir="data/cache"):
+    def __init__(self, model_name="distilbert-base-nli-mean-tokens", device=None, cache_dir="data/cache"):
         self.cache_dir = setup_cache_dir(cache_dir)
+        self.model_name = model_name
         
         # Initialize KeyBERT
         try:
-            # Device can be "cpu" or "cuda" or None (auto-detect)
-            self.kw_model = KeyBERT(model=model_name, device=device)
-            logger.info(f"KeyBERT initialized with model {model_name}")
+            # Load the sentence transformer model first
+            logger.info(f"Loading SentenceTransformer model {model_name}...")
+            model = SentenceTransformer(model_name)
+            
+            # Move model to specified device
+            if device == "cuda":
+                model = model.to("cuda")
+            
+            # Initialize KeyBERT with the model
+            self.kw_model = KeyBERT(model=model)
+            logger.info(f"KeyBERT initialized successfully with model {model_name}")
             
             # Stopwords list
             self.stopwords = self._load_stopwords()
+            
         except Exception as e:
-            logger.error(f"Error initializing KeyBERT: {e}")
-            raise
+            logger.error(f"Error initializing KeyBERT with model {model_name}: {e}")
+            try:
+                # Try fallback model
+                fallback_model = "distilbert-base-nli-mean-tokens"
+                logger.info(f"Trying fallback model: {fallback_model}")
+                model = SentenceTransformer(fallback_model)
+                if device == "cuda":
+                    model = model.to("cuda")
+                self.kw_model = KeyBERT(model=model)
+                self.stopwords = self._load_stopwords()
+                logger.info(f"Successfully initialized with fallback model {fallback_model}")
+            except Exception as e2:
+                logger.error(f"Fallback initialization also failed: {e2}")
+                raise
     
     def _load_stopwords(self):
         """Load list of common stopwords"""
@@ -51,17 +74,28 @@ class TagGenerator:
         clean_tags = []
         
         for tag, score in tags_list:
+            # Skip if tag is None or empty
+            if not tag:
+                continue
+                
+            # Convert to string and clean
+            tag = str(tag).strip().lower()
+            
             # Remove punctuation at start/end
             tag = tag.strip(string.punctuation)
             
-            # Skip tags that are too short
-            if len(tag) >= min_length:
+            # Skip if too short or in stopwords
+            if len(tag) >= min_length and tag not in self.stopwords:
                 clean_tags.append((tag, score))
         
         return clean_tags
     
-    def generate_tags(self, description, image_path=None, num_tags=25, use_cache=True):
+    def generate_tags(self, description, image_path=None, num_tags=25, diversity=0.7, use_cache=True):
         """Generate tags from description with cache support"""
+        if not description:
+            logger.warning("Empty description provided")
+            return []
+            
         # Create cache file path if image_path is provided
         cache_path = None
         if image_path and use_cache:
@@ -86,15 +120,19 @@ class TagGenerator:
             )
             
             # Extract keywords with diversity (MMR)
-            keywords = self.kw_model.extract_keywords(
-                description,
-                keyphrase_ngram_range=(1, 2),
-                stop_words=self.stopwords,
-                use_mmr=True,                    # Use MMR for diverse results
-                diversity=0.7,                   # Diversity level (0-1)
-                top_n=40,                        # Get more for filtering
-                vectorizer=vectorizer
-            )
+            try:
+                keywords = self.kw_model.extract_keywords(
+                    description,
+                    keyphrase_ngram_range=(1, 2),
+                    stop_words=self.stopwords,
+                    use_mmr=True,                    # Use MMR for diverse results
+                    diversity=diversity,             # Diversity level (0-1)
+                    top_n=40,                        # Get more for filtering
+                    vectorizer=vectorizer
+                )
+            except Exception as kw_error:
+                logger.error(f"Error extracting keywords: {kw_error}")
+                return []
             
             # Clean the tags list
             clean_keywords = self._clean_tags(keywords)
@@ -107,6 +145,7 @@ class TagGenerator:
                 save_to_cache({"tags": top_tags}, cache_path)
             
             return top_tags
+            
         except Exception as e:
             logger.error(f"Error generating tags: {e}")
             return [] 
