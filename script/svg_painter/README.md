@@ -1,6 +1,7 @@
 # SVG Painter
 
 Module tự động tô màu cho các file SVG từ bộ màu được định nghĩa trước.
+* Màu lấy từ https://loading.io/asset
 
 ## Tính năng chính
 
@@ -96,6 +97,7 @@ File JSON chứa bộ màu cần theo format:
 
 ## Lưu ý
 
+- Chọn các set màu cho chuẩn, xóa các màu lem nhem ra khỏi set dùm cái, trước khi merge
 - Đảm bảo quyền ghi vào thư mục đầu ra
 - Backup dữ liệu trước khi xử lý hàng loạt
 - Kiểm tra kết quả sau khi xử lý
