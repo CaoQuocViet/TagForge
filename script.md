@@ -43,3 +43,5 @@ python script/unzip/main.py --mode svg_only
 
 ## Với đường dẫn tùy chỉnh
 python script/unzip/main.py "E:\WORK\canva\mysamples"
+
+.\venv\Scripts\Activate.ps1; 
