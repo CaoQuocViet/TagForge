@@ -17,12 +17,25 @@ def load_palette_file(file_path: str) -> Dict:
 def get_palette_id_from_filename(filename: str) -> str:
     """Extract palette ID from filename"""
     base_name = os.path.splitext(filename)[0]
-    # Remove 'sample' prefix and handle both 'sample.json' and 'sample (N).json' formats
+    
+    # Handle base sample file
     if base_name == 'sample':
         return 'palette_1'
-    else:
-        number = base_name.split('(')[-1].split(')')[0]
-        return f'palette_{int(number) + 1}'
+    
+    # Handle sample with number in parentheses
+    try:
+        # Extract text between parentheses
+        if '(' in base_name and ')' in base_name:
+            number_part = base_name.split('(')[1].split(')')[0].strip()
+            # Extract first number from the text
+            number = ''.join(c for c in number_part if c.isdigit())
+            if number:
+                return f'palette_{int(number)}'
+    except:
+        pass
+    
+    # If we can't parse the number, use a hash of the filename
+    return f'palette_{hash(base_name) % 1000 + 1000}'
 
 def merge_palettes() -> None:
     """Merge all palette files into a single JSON file with IDs"""
@@ -32,21 +45,39 @@ def merge_palettes() -> None:
     json_files = [f for f in os.listdir(SAMPLE_PALETTES_DIR) if f.endswith('.json')]
     
     # Sort files to ensure consistent ordering
-    json_files.sort(key=lambda x: int(''.join(filter(str.isdigit, x))) if any(c.isdigit() for c in x) else 0)
+    def get_sort_key(filename):
+        try:
+            # Extract number for sorting
+            base_name = os.path.splitext(filename)[0]
+            if '(' in base_name and ')' in base_name:
+                number_part = base_name.split('(')[1].split(')')[0].strip()
+                number = ''.join(c for c in number_part if c.isdigit())
+                if number:
+                    return int(number)
+        except:
+            pass
+        return float('inf')  # Put files without numbers at the end
+    
+    json_files.sort(key=get_sort_key)
     
     # Process each file
     for filename in json_files:
         file_path = os.path.join(SAMPLE_PALETTES_DIR, filename)
-        palette_data = load_palette_file(file_path)
-        
-        # Generate palette ID from filename
-        palette_id = get_palette_id_from_filename(filename)
-        
-        # Extract colors and add to merged data
-        merged_data[palette_id] = {
-            'name': palette_data.get('name', palette_id),
-            'colors': [color['value'] for color in palette_data['colors']]
-        }
+        try:
+            palette_data = load_palette_file(file_path)
+            
+            # Generate palette ID from filename
+            palette_id = get_palette_id_from_filename(filename)
+            
+            # Extract colors and add to merged data
+            merged_data[palette_id] = {
+                'name': palette_data.get('name', palette_id),
+                'colors': [color['value'] for color in palette_data['colors']]
+            }
+            print(f"Processed {filename} -> {palette_id}")
+        except Exception as e:
+            print(f"Error processing {filename}: {str(e)}")
+            continue
     
     # Create output directory if it doesn't exist
     os.makedirs(os.path.dirname(MERGED_COLORS_FILE), exist_ok=True)
@@ -55,7 +86,7 @@ def merge_palettes() -> None:
     with open(MERGED_COLORS_FILE, 'w', encoding='utf-8') as f:
         json.dump(merged_data, f, indent=2, ensure_ascii=False)
     
-    print(f"Successfully merged {len(json_files)} palettes into {MERGED_COLORS_FILE}")
+    print(f"\nSuccessfully merged {len(merged_data)} palettes into {MERGED_COLORS_FILE}")
 
 if __name__ == '__main__':
     merge_palettes()
